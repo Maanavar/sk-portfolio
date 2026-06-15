@@ -1,0 +1,21 @@
+{
+  "name": "Senthilkumar Sivaraman",
+  "short_name": "Senthil",
+  "description": "AI Product Strategist & Startup Co-Founder",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf9fc",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "assets/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
