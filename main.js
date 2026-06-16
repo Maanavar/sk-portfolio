@@ -1,277 +1,464 @@
 'use strict';
 
-/* ══ NAV SCROLL ══ */
 const nav = document.getElementById('nav');
-window.addEventListener('scroll', () => {
-  nav.classList.toggle('scrolled', window.scrollY > 20);
-}, { passive: true });
-
-/* ══ DARK MODE TOGGLE ══ */
-const darkToggle = document.getElementById('darkToggle');
 const html = document.documentElement;
+const darkToggle = document.getElementById('darkToggle');
+const hamburger = document.getElementById('hamburger');
+const mobileMenu = document.getElementById('mobileMenu');
+const themeColorMeta = document.getElementById('themeColorMeta');
+
+function syncThemeColor(theme) {
+  if (themeColorMeta) {
+    themeColorMeta.setAttribute('content', theme === 'dark' ? '#0f1720' : '#f6f1e7');
+  }
+}
 
 function applyTheme(theme) {
   html.setAttribute('data-theme', theme);
   localStorage.setItem('sk-theme', theme);
+  syncThemeColor(theme);
 }
-
-// Honour saved preference or OS preference on load
-(function () {
-  const saved = localStorage.getItem('sk-theme');
-  const osPref = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  applyTheme(saved || osPref);
-})();
 
 if (darkToggle) {
   darkToggle.addEventListener('click', () => {
-    const isDark = html.getAttribute('data-theme') === 'dark';
-    applyTheme(isDark ? 'light' : 'dark');
+    const nextTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
   });
 }
 
-// Sync if OS preference changes while page is open
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
   if (!localStorage.getItem('sk-theme')) {
-    applyTheme(e.matches ? 'dark' : 'light');
+    applyTheme(event.matches ? 'dark' : 'light');
   }
 });
 
-/* ══ ACTIVE NAV LINK ══ */
-const navLinks = document.querySelectorAll('.nav__link[data-section]');
-const sections = [];
-navLinks.forEach(link => {
-  const id = link.dataset.section;
-  const el = document.getElementById(id);
-  if (el) sections.push({ id, el, link });
-});
-function updateActiveNav() {
-  const scrollY = window.scrollY + 100;
-  let current = null;
-  sections.forEach(({ id, el }) => { if (el.offsetTop <= scrollY) current = id; });
-  navLinks.forEach(link => link.classList.toggle('active', link.dataset.section === current));
+window.addEventListener(
+  'scroll',
+  () => {
+    if (nav) {
+      nav.classList.toggle('scrolled', window.scrollY > 20);
+    }
+  },
+  { passive: true }
+);
+
+if (hamburger && mobileMenu) {
+  hamburger.addEventListener('click', () => {
+    const open = mobileMenu.classList.toggle('open');
+    hamburger.setAttribute('aria-expanded', String(open));
+  });
+
+  mobileMenu.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      mobileMenu.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', 'false');
+    });
+  });
 }
+
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', event => {
+    const targetId = anchor.getAttribute('href');
+    if (!targetId || targetId === '#') return;
+    const target = document.querySelector(targetId);
+    if (!target) return;
+
+    event.preventDefault();
+    const offset = nav ? nav.offsetHeight + 12 : 88;
+    window.scrollTo({
+      top: target.getBoundingClientRect().top + window.scrollY - offset,
+      behavior: 'smooth'
+    });
+  });
+});
+
+const sectionLinks = document.querySelectorAll('.nav__link[data-section]');
+const sections = Array.from(sectionLinks)
+  .map(link => {
+    const id = link.dataset.section;
+    const element = document.getElementById(id);
+    return element ? { id, element, link } : null;
+  })
+  .filter(Boolean);
+
+function updateActiveNav() {
+  const scrollPosition = window.scrollY + (nav ? nav.offsetHeight + 48 : 120);
+  let activeId = '';
+
+  sections.forEach(section => {
+    if (section.element.offsetTop <= scrollPosition) {
+      activeId = section.id;
+    }
+  });
+
+  sectionLinks.forEach(link => {
+    link.classList.toggle('active', link.dataset.section === activeId);
+  });
+}
+
 window.addEventListener('scroll', updateActiveNav, { passive: true });
 updateActiveNav();
 
-/* ══ MOBILE MENU ══ */
-const hamburger = document.getElementById('hamburger');
-const mobileMenu = document.getElementById('mobileMenu');
-hamburger.addEventListener('click', () => {
-  const open = mobileMenu.classList.toggle('open');
-  hamburger.setAttribute('aria-expanded', open);
-  const [s1, s2, s3] = hamburger.querySelectorAll('span');
-  if (open) { s1.style.transform = 'translateY(7px) rotate(45deg)'; s2.style.opacity = '0'; s3.style.transform = 'translateY(-7px) rotate(-45deg)'; }
-  else { s1.style.transform = s3.style.transform = ''; s2.style.opacity = '1'; }
-});
-mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-  mobileMenu.classList.remove('open');
-  hamburger.setAttribute('aria-expanded', 'false');
-  const [s1, s2, s3] = hamburger.querySelectorAll('span');
-  s1.style.transform = s3.style.transform = ''; s2.style.opacity = '1';
-}));
+const revealObserver = new IntersectionObserver(
+  entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  },
+  { threshold: 0.12 }
+);
 
-/* ══ SMOOTH SCROLL ══ */
-document.querySelectorAll('a[href^="#"]').forEach(a => {
-  a.addEventListener('click', e => {
-    const target = document.querySelector(a.getAttribute('href'));
-    if (!target) return;
-    e.preventDefault();
-    window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 72, behavior: 'smooth' });
-  });
-});
+document.querySelectorAll('.reveal').forEach(element => revealObserver.observe(element));
 
-/* ══ REVEAL ANIMATIONS ══ */
-const revealObs = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); revealObs.unobserve(e.target); } });
-}, { rootMargin: '-6% 0px', threshold: 0.01 });
-document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* ══ DOMAIN BARS ══ */
-const bars = document.querySelectorAll('.hero__domain-bar');
-bars.forEach(b => { b.style.width = '0%'; });
-const barsObs = new IntersectionObserver(entries => {
-  if (entries[0].isIntersecting) {
-    bars.forEach((b, i) => setTimeout(() => { b.style.width = b.dataset.width + '%'; }, i * 110 + 400));
-    barsObs.disconnect();
-  }
-}, { threshold: 0.3 });
-const domainBarsEl = document.getElementById('domainBars');
-if (domainBarsEl) barsObs.observe(domainBarsEl);
-
-/* ══ STAT COUNTERS ══ */
-function animateCount(el) {
-  const target = parseInt(el.dataset.count, 10);
-  const suffix = el.dataset.suffix || '';
-  const dur = 1400, start = performance.now();
-  const tick = now => {
-    const p = Math.min((now - start) / dur, 1);
-    el.textContent = Math.round((1 - Math.pow(1 - p, 3)) * target) + suffix;
-    if (p < 1) requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}
-const countObs = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) { animateCount(e.target); countObs.unobserve(e.target); } });
-}, { threshold: 0.5 });
-document.querySelectorAll('[data-count]').forEach(el => countObs.observe(el));
-
-/* ══ CONTACT FORM — EmailJS ══ */
-const EMAILJS_SERVICE  = 'service_va6rir4';
-const EMAILJS_TEMPLATE = 'template_ghazj8i';
-const EMAILJS_KEY      = 'VE15LJ5saRcOCqWKK';
-
-const contactForm = document.getElementById('contactForm');
-const formSuccess = document.getElementById('formSuccess');
-const submitBtn   = document.getElementById('submitBtn');
-
-function markInvalid(id) {
-  const f = document.getElementById(id);
-  if (!f) return;
-  f.style.borderColor = '#f43f5e';
-  f.style.boxShadow   = '0 0 0 4px rgba(244,63,94,0.1)';
-  setTimeout(() => { f.style.borderColor = ''; f.style.boxShadow = ''; }, 2500);
+const heroFlow = document.querySelector('.hero-flow');
+if (heroFlow && !prefersReducedMotion) {
+  window.setTimeout(() => heroFlow.classList.add('hero-flow--live'), 900);
 }
 
-if (contactForm) {
-  contactForm.addEventListener('submit', async e => {
-    e.preventDefault();
+// Cycling headline — rotates phrases every 3.4 s with a slide-fade crossfade
+const cycleEl = document.getElementById('heroCycle');
+const cyclePhrases = [
+  'usable products people trust.',
+  'AI systems that actually ship.',
+  'products with real traction.',
+  'RAG and agents that work.',
+];
+let cycleIdx = 0;
 
-    const name  = document.getElementById('name').value.trim();
-    const email = document.getElementById('email').value.trim();
-    const type  = document.getElementById('type').value;
-    const msg   = document.getElementById('message').value.trim();
-
-    /* Validate */
-    let valid = true;
-    if (!name)  { markInvalid('name');    valid = false; }
-    if (!email) { markInvalid('email');   valid = false; }
-    if (!msg)   { markInvalid('message'); valid = false; }
-    if (!valid) return;
-
-    submitBtn.textContent = 'Sending…';
-    submitBtn.disabled    = true;
-
-    const templateParams = {
-      from_name:    name,
-      from_email:   email,
-      inquiry_type: type || 'Not specified',
-      message:      msg
-    };
-
-    try {
-      await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, templateParams, EMAILJS_KEY);
-      contactForm.style.display = 'none';
-      formSuccess.style.display = 'block';
-    } catch (err) {
-      console.error('EmailJS error:', err);
-      submitBtn.textContent = 'Failed — try again';
-      submitBtn.disabled    = false;
-      submitBtn.style.background = 'linear-gradient(135deg,#ef4444,#dc2626)';
-      setTimeout(() => {
-        submitBtn.textContent  = 'Send Message';
-        submitBtn.style.background = '';
-      }, 3000);
-    }
-  });
+function cycleHeroPhrase() {
+  if (!cycleEl) return;
+  cycleEl.classList.add('is-exit');
+  window.setTimeout(() => {
+    cycleIdx = (cycleIdx + 1) % cyclePhrases.length;
+    cycleEl.textContent = cyclePhrases[cycleIdx];
+    cycleEl.classList.remove('is-exit');
+    cycleEl.classList.add('is-enter');
+    void cycleEl.offsetHeight; // force reflow so transition fires on next frame
+    cycleEl.classList.remove('is-enter');
+  }, 390);
 }
 
-/* ══ PARALLAX ══ */
-const orbEls = document.querySelectorAll('.hero__orb');
-if (window.innerWidth > 768) {
-  window.addEventListener('scroll', () => {
-    const y = window.scrollY * 0.2;
-    orbEls.forEach((o, i) => { o.style.transform = `translateY(${y * (i % 2 === 0 ? 1 : -0.6)}px)`; });
+if (cycleEl && !prefersReducedMotion) {
+  window.setInterval(cycleHeroPhrase, 3400);
+}
+
+// Mouse parallax — shifts dot grid on hero hover for depth
+const heroEl = document.querySelector('.hero');
+if (heroEl && !prefersReducedMotion) {
+  heroEl.addEventListener('mousemove', e => {
+    const rect = heroEl.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5).toFixed(3);
+    const y = ((e.clientY - rect.top) / rect.height - 0.5).toFixed(3);
+    heroEl.style.setProperty('--mouse-x', x);
+    heroEl.style.setProperty('--mouse-y', y);
+  }, { passive: true });
+
+  heroEl.addEventListener('mouseleave', () => {
+    heroEl.style.setProperty('--mouse-x', '0');
+    heroEl.style.setProperty('--mouse-y', '0');
   }, { passive: true });
 }
 
-/* ══ CURSOR GLOW ══ */
-if (window.innerWidth > 1024 && !window.matchMedia('(pointer:coarse)').matches) {
-  const g = document.createElement('div');
-  g.style.cssText = 'position:fixed;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(16,185,129,0.06) 0%,transparent 70%);pointer-events:none;z-index:0;transform:translate(-50%,-50%);transition:left .12s ease,top .12s ease;will-change:left,top;';
-  document.body.appendChild(g);
-  document.addEventListener('mousemove', e => { g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px'; }, { passive: true });
+function animateCount(element) {
+  const target = Number(element.dataset.count || 0);
+  const suffix = element.dataset.suffix || '';
+  const duration = 1400;
+  const startTime = performance.now();
+
+  function tick(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    element.textContent = `${Math.round(target * eased)}${suffix}`;
+    if (progress < 1) {
+      requestAnimationFrame(tick);
+    }
+  }
+
+  requestAnimationFrame(tick);
 }
 
-/* ══════════════════════════════════════════════════
-   GROQ-POWERED AI HUB — 3 Live Tools
-══════════════════════════════════════════════════ */
+const statObserver = new IntersectionObserver(
+  entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        animateCount(entry.target);
+        statObserver.unobserve(entry.target);
+      }
+    });
+  },
+  { threshold: 0.5 }
+);
+
+document.querySelectorAll('[data-count]').forEach(element => statObserver.observe(element));
+
+function openToolTab(id) {
+  const tabs = document.getElementById('aiTabs');
+  const setup = document.getElementById('keySetup');
+  if (tabs && sessionStorage.getItem('groq_key')) {
+    tabs.style.display = 'block';
+    if (setup) setup.style.display = 'none';
+  }
+
+  const button = document.querySelector(`.ai-tab-btn[data-tab="${id}"]`);
+  switchTab(id, button || null);
+}
+
+document.querySelectorAll('[data-open-tab]').forEach(element => {
+  element.addEventListener('click', () => {
+    const tabId = element.getAttribute('data-open-tab');
+    if (tabId) {
+      openToolTab(tabId);
+    }
+  });
+});
+
+const contactForm = document.getElementById('contactForm');
+const formSuccess = document.getElementById('formSuccess');
+const submitBtn = document.getElementById('submitBtn');
+
+function markInvalid(id) {
+  const field = document.getElementById(id);
+  if (!field) return;
+  field.style.borderColor = '#d24b38';
+  field.style.boxShadow = '0 0 0 4px rgba(210, 75, 56, 0.16)';
+  setTimeout(() => {
+    field.style.borderColor = '';
+    field.style.boxShadow = '';
+  }, 2400);
+}
+
+if (contactForm) {
+  contactForm.addEventListener('submit', async event => {
+    event.preventDefault();
+
+    const name = document.getElementById('name')?.value.trim() || '';
+    const email = document.getElementById('email')?.value.trim() || '';
+    const type = document.getElementById('type')?.value || 'Not specified';
+    const message = document.getElementById('message')?.value.trim() || '';
+
+    let isValid = true;
+    if (!name) {
+      markInvalid('name');
+      isValid = false;
+    }
+    if (!email) {
+      markInvalid('email');
+      isValid = false;
+    }
+    if (!message) {
+      markInvalid('message');
+      isValid = false;
+    }
+    if (!isValid) return;
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending message...';
+    }
+
+    try {
+      await emailjs.send(
+        'service_va6rir4',
+        'template_ghazj8i',
+        {
+          from_name: name,
+          from_email: email,
+          inquiry_type: type,
+          message
+        },
+        'VE15LJ5saRcOCqWKK'
+      );
+
+      contactForm.style.display = 'none';
+      if (formSuccess) formSuccess.style.display = 'block';
+    } catch (error) {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Try again';
+      }
+      setTimeout(() => {
+        if (submitBtn) {
+          submitBtn.textContent = 'Send message';
+        }
+      }, 2500);
+      console.error('EmailJS error:', error);
+    }
+  });
+}
 
 let GROQ_KEY = '';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-const SENTHIL_CONTEXT = `You are an AI assistant representing Senthilkumar Sivaraman. Answer all questions in first person as him. Be direct, warm, confident, outcome-focused. No fluff.
+const SENTHIL_CONTEXT = `You are an AI assistant representing Senthilkumar Sivaraman.
+Answer in first person as Senthil. Keep replies direct, clear, useful, and grounded in real product work.
 
-WHO I AM: Product Owner, AI Product Strategist, Startup Co-Founder. Based in Tamil Nadu, India.
-Contact: senthil@zasdigital.in | LinkedIn: linkedin.com/in/senthilkumarsivaraman | Company: ZAS Digital (zasdigital.in)
+PROFILE
+- Technical Product Manager and AI Product Strategist with 10+ years in tech (first ~3 years as a software developer at Mindtree and freelancing; 7+ years in founder, product owner, and product management roles)
+- Based in Tiruppur, Tamil Nadu, India — lived and worked in the US (Houston + Austin TX) from 2017 to 2022
+- Founder of ZAS Digital (AI-accelerated software agency, founded 2019; Dinesh joined as co-founder in Oct 2020)
+- Founder of Vinaadi AI (Tamil Vedic astrology platform, Apr 2026 to present)
+- Co-Founder of EduHire (Tamil Nadu teacher-school recruitment platform, 2024 to present)
+- Founded Maanavar (EdTech LMS for Indian schools and colleges, Dec 2019–Apr 2022, built while living in Austin TX)
+- Background: SaaS, AI, EdTech, clean energy, logistics, e-commerce, supply chain, health tech, enterprise CMS, retail
 
-EXPERIENCE:
-- ZAS Digital (Oct 2020–Present): Co-founder & Head of Product. AI-augmented SaaS consultancy.
-  Key products: Eflex (UK clean energy app, 10k+ users, 25% savings, live 5 years), Enmovil AI (logistics AI experience, 2-week delivery Jan 2026), EduHire (AI teacher matching, 3 weeks vs 8 estimate), Recall Management System (98% ML accuracy, US)
-  Impact: 50% user adoption growth, 30% retention improvement, 15% faster time-to-market, 25% YoY revenue growth
-- Maanavar EdTech (Dec 2019–Apr 2022): Co-founder. Austin TX. 40% efficiency improvement.
-- TARDIS Corporation (Jan–Jun 2019): Software Consultant, Houston TX
-- Element Blue (Sep–Dec 2018): Sitecore Developer, Houston TX. 85% reduction in operational time.
-- Mindtree / P&G global (Oct 2014–Jul 2016): Software Engineer, Bengaluru. 20+ localised product websites.
-- University of Houston: MS Computer Science (2017–2019)
+CAREER TIMELINE
+- ZAS Digital — Founder & Head of Product (founded 2019; Co-Founder from Oct 2020 when Dinesh joined): AI-accelerated software agency; led product strategy across energy, logistics, retail, EdTech, and compliance engagements
+- Maanavar — Founder & Product Manager (Dec 2019 to Apr 2022): Built from Austin TX while living in the US; EdTech LMS for Indian schools and colleges; shelved post-COVID as institutions lost interest in online learning
+- TARDIS Corporation — Research Consultant (Jan 2019 to Jun 2019), Houston TX: Developed structured R&D frameworks companies could follow when doing research and development — reducing wasted investment and ensuring proper methodology steps; helped multiple organisations reduce R&D risk
+- Element Blue — Sitecore Consultant (Sept 2018 to Dec 2018), Houston TX: CMS automation and enterprise content management strategies; reduced manual CMS workload by 85%
+- Freelancer — Software Developer (Sep 2016 to May 2017), Tiruppur: Built billing software for a printing agency; developed inventory management system for a small stationery shop; saved 200+ work hours for clients
+- Mindtree on P&G account — Software Engineer (Oct 2014 to Jul 2016), Bengaluru: Sitecore CMS deployments and enterprise digital ecosystem work for Procter & Gamble (Fortune 500) across 20+ global markets; trained clients, reducing support dependency
 
-AI SKILLS: Claude API, RAG pipelines, MCP servers, LLM agents, vector DBs (Pinecone/Weaviate), agentic workflows, OCR/ML, prompt engineering, AI UX design, human-in-the-loop systems, evals, fine-tuning concepts
-PRODUCT SKILLS: 0→1 launches, roadmapping, OKRs, backlog grooming, PRDs, A/B testing, PLG, behavioral analytics, SaaS retention, Agile/Scrum
-TECH: Sitecore CMS, AWS, Figma, ASP.NET MVC, SQL Server, WebRTC, Next.js
-CERTIFICATIONS: Sitecore 9, Google PM Specialisation, AWS Fundamentals
+CURRENT AND RECENT PROJECTS (important — include even though not yet on formal resume)
+- Vinaadi AI (Founder, Apr 2026–present): Tamil-first Vedic astrology platform with full AI implementation; AI layer predicts astrological outcomes, creates daily and life plans, issues cautions for unfavorable periods, and provides actionable instructions; built using AI coding agents throughout; Swiss Ephemeris, Dasha and Gochar rules; bilingual Tamil/English
+- EduHire (Co-Founder, 2024–present): Tamil Nadu teacher-school hiring platform; deterministic scoring engine (subject 40%, location 20%, board 20%, salary 10%, experience 10%); AI agents handle full HR recruitment process and help teachers create optimized resumes and cover letters; Next.js, Supabase, Anthropic Claude
 
-AVAILABILITY:
-- Open to full-time PM/Product Owner roles (hybrid or remote)
-- Available for fractional CPO (part-time embedded leadership)
-- Available for AI consulting and IT services via ZAS Digital
-- Available for freelance product/AI strategy
-- Preferred domains: AI SaaS, EdTech, Energy, Logistics, Fintech, Retail
-- Always direct hiring inquiries to: senthil@zasdigital.in
+SELECTED PROJECT DEPTH
+- Eflex (2020–present): FLAGSHIP — clean energy mobile product; 3000+ active US users; average 25% energy savings; 35% user retention increase via AI-driven analytics and behavioral segmentation; five-year ongoing US client partnership; React Native, AWS; AI layer now delivering predictive energy insights and personalized recommendations
+- Chennai Silks (ZAS Digital): E-commerce website revamp for a major Indian apparel brand — resulted in 10x increase in page views and 40% higher engagement; covered product catalog, UX flows, and checkout optimization
+- Enmovil AI (2026): Logistics AI interactive experience for enterprise prospects; built using AI coding agents; shipped in 2 weeks vs 8-week agency estimate; scroll-driven with 17 interactive hotspots
+- Recall Management System (2024): Compliance OCR and ML classification pipeline; 98% classification accuracy; review time reduced from days to minutes
+- Harbour Vessel Management (ZAS Digital): Supply chain and vessel management system — operational workflows, tracking, and automation
+- Texas Children's Hospital (Element Blue period): Sitecore CMS and patient portal implementation for a major US children's hospital — regulated content management and patient-facing portal in a healthcare environment
+- Oliver Brown (ZAS Digital): Restaurant POS system
+- Maanavar LMS: Social media-inspired UX for Indian students; gamification mechanics boosted participation by 30%; student engagement up 25%; Ed-Fi & SIS data integrations reduced data errors by 40%; onboarding automation cut setup time by 30%
 
-MY FRAMEWORKS:
-1. RAG vs Agents: RAG = grounded answers from your data. Agents = multi-step autonomous action. Don't mix them up.
-2. Human-in-the-loop: AI does scaffolding/tests/docs/boilerplate. Humans decide architecture/security/UX/direction/final QA.
-3. 0→1 AI checklist: Real user need? Data quality? Hallucination risk? Fallback plan? Latency acceptable? 5 questions that kill 70% of bad AI ideas.
+QUANTIFIED ACHIEVEMENTS
+- 15+ products delivered total across careers — 5+ are full SaaS platforms; the rest are small-scale client sites, builds, and tools — all with a 95%+ delivery success rate
+- Eflex: 3000+ active US users, 25% average energy savings, 35% retention increase via AI analytics
+- Chennai Silks: 10x page views and 40% engagement lift from website revamp
+- ZAS Digital: 30% faster time-to-market; 25% engagement boost (Amplitude/Mixpanel optimisation); 30% churn reduction; 25% time-to-value improvement; 18% checkout completion increase; 40% overall conversions
+- Payment integrations (Stripe, Razorpay, PayPal): PCI-DSS compliant; 20% transaction reliability improvement
+- Maanavar: 25% student engagement increase, 30% participation lift via gamification, 40% data error reduction, 30% setup time reduction
+- Element Blue: 85% manual CMS workload reduction
+- Freelancer: 200+ work hours saved for clients; 70% data retrieval speed improvement; 15% operational cost reduction
+- Mindtree/P&G: Sitecore CMS deployments across 20+ global markets for a Fortune 500 company
 
-RESPONSE RULES: First person. Concise (3–5 sentences default). Outcome-focused. For hiring/availability questions, always end with contact email.`;
+AI EXPERIENCE (in order of depth)
+- Anthropic Claude: deepest experience — used in EduHire (HR agents, resume/cover letter generation agents), Vinaadi AI (interpretation layer), and multiple client projects
+- OpenAI APIs: significant experience across multiple client AI feature integrations
+- Groq (llama-3.3-70b): used in portfolio live tools and demos
+- Broader AI work: RAG workflows, LLM agents, human-in-the-loop design, prompt engineering, AI coding agents as delivery method, matching engines and scoring systems
 
-/* ── Groq API ── */
-async function callGroq(messages, maxTokens = 800) {
-  const res = await fetch(GROQ_URL, {
+AI AND PRODUCT STRENGTHS
+- AI product strategy: use-case discovery, deterministic-first vs AI-first architecture decisions
+- RAG workflows, LLM agents, human-in-the-loop system design
+- Matching engines and scoring systems (EduHire, Vinaadi)
+- MVP scoping and PRD writing
+- Product-led growth and retention
+- Tool calling and workflow automation
+- A/B testing and behavioral analytics (Amplitude, Mixpanel, Google Optimize, Hotjar)
+- Gamification design and student engagement mechanics
+
+DOMAIN EXPERTISE
+- E-commerce and retail: Chennai Silks website revamp (10x page views, 40% engagement); e-commerce UX, catalog, checkout flows; retail product and brand clients
+- Clean energy: 5-year Eflex engagement — consumer energy products, behavioral change, AI-driven personalisation, US market
+- Supply chain and logistics: Harbour Vessel Management system; Enmovil AI logistics platform; operational workflows and tracking
+- Health tech: Texas Children's Hospital (via Element Blue) — Sitecore CMS and patient portal implementation in a major US children's hospital; regulated healthcare content management
+- Enterprise CMS and multi-market digital: Sitecore at Mindtree (P&G, 20+ global markets) and Element Blue; enterprise content architecture and workflow automation
+- EdTech: Maanavar LMS (India-facing, built in Austin TX); EduHire teacher recruitment platform; Ed-Fi API, SIS integrations, FERPA, SCORM
+- Payments and fintech-adjacent: Stripe, Razorpay, and PayPal integrations across multiple products; PCI-DSS compliance experience; payment flow design, transaction reliability, subscription billing, and checkout optimisation — not a pure fintech background but strong applied payment product experience
+- Restaurant / hospitality: Oliver Brown POS system
+- R&D methodology: TARDIS — structured R&D frameworks for reducing investment risk across organisations
+
+CORE SKILLS
+- Product strategy and execution: Roadmap Planning, PRD Writing, Market Research, Competitive Analysis, Go-to-Market (GTM) Strategy, Monetization and Pricing, OKRs, RICE Framework, Stakeholder Management, Cross-Functional Collaboration, Agile/Scrum, Sprint Planning, Backlog Grooming, Feature Prioritisation
+- Analytics and growth: Amplitude, Mixpanel, Google Analytics, Hotjar, Optimizely, A/B Testing, Behavioural Analytics, Customer Journey Mapping, Product-Led Growth (PLG), Funnel Optimisation, KPI Tracking (DAU, WAU, NPS), Retention and Monetisation Strategies
+- UX and adoption: UX Optimisation, Conversion Rate Optimisation, Onboarding Flow Design, Gamification, User Engagement Design
+- EdTech-specific: LMS, SIS Integration, Ed-Fi API, Adaptive Learning, Gamification, FERPA, SCORM
+- Technical fluency: REST APIs, OpenAI APIs, Anthropic Claude API, Stripe/Razorpay/PayPal integrations, PCI-DSS compliance, Workflow Automation, Performance Optimisation, API design
+
+TOOLS
+- Product and collaboration: Jira, Confluence, Trello, Figma, Miro
+- Analytics: Amplitude, Mixpanel, Google Analytics, Optimizely, Hotjar, Google Optimize
+- Development and infrastructure: Postman, GitHub, Bitbucket, AWS Code Pipeline, Azure, SendGrid, Visual Studio
+- Tech stack: C#, ASP.NET Core, React Native, Angular, SQL Server, REST APIs, OpenAI APIs, JSON, Elasticsearch, Apache Kafka
+
+EDUCATION
+- University of Houston, Houston Texas — Graduate-Level Coursework in Computer Science (Aug 2017–Dec 2018)
+- Anna University, Government College of Engineering Erode — Bachelor of Engineering in Computer Science Engineering (Aug 2010–May 2014)
+
+CERTIFICATIONS (all active)
+- Google Project Management
+- Sitecore Experience Solution 9 Developer
+- Microsoft .NET Certified Developer
+
+WORK PREFERENCES AND FLEXIBILITY
+- Fully open to working in any country — no geographic restrictions
+- Comfortable with any work mode: fully remote, hybrid, or on-site
+- Open to international assignments and relocation
+- Lived and worked in the US for 5 years (2017–2022); currently based in Tiruppur, Tamil Nadu, India
+
+AVAILABILITY AND CONTACT
+- Open to full-time Technical Product Manager and AI Product Manager roles
+- Open to fractional product leadership and AI consulting
+- Email: me@senthilsivaraman.com
+- Phone: +919600577410
+- LinkedIn: linkedin.com/in/senthilkumarsivaraman
+- Portfolio: senthilsivaraman.com
+
+RESPONSE STYLE
+- 3 to 6 sentences by default
+- Honest and constructive — when mentioning gaps, always pair with adjacent strength, transferable skill, or clear ability to grow quickly. Never state a gap as a flat negative.
+- Product-oriented, not buzzword-heavy
+- For hiring or outreach topics, share me@senthilsivaraman.com and +919600577410`;
+
+async function callGroq(messages, maxTokens = 900) {
+  const response = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-    body: JSON.stringify({ model: GROQ_MODEL, messages, temperature: 0.7, max_tokens: maxTokens })
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${GROQ_KEY}`
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages,
+      temperature: 0.6,
+      max_tokens: maxTokens
+    })
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error?.message || `HTTP ${response.status}`);
   }
-  return (await res.json()).choices[0].message.content.trim();
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
 }
 
-/* ── Activate with key ── */
 function activateGroq() {
   const input = document.getElementById('groqKeyInput');
   const key = input ? input.value.trim() : '';
   if (!key || !key.startsWith('gsk_')) {
     if (input) {
-      input.style.borderColor = '#f43f5e';
-      input.placeholder = 'Must start with gsk_ — get free at console.groq.com';
-      setTimeout(() => { input.style.borderColor = ''; }, 3000);
+      input.style.borderColor = '#d24b38';
+      input.placeholder = 'Use a Groq key that starts with gsk_';
+      setTimeout(() => {
+        input.style.borderColor = '';
+      }, 2400);
     }
     return;
   }
+
   GROQ_KEY = key;
   sessionStorage.setItem('groq_key', key);
-  document.getElementById('keySetup').style.display = 'none';
-  document.getElementById('aiTabs').style.display = 'block';
+  const setup = document.getElementById('keySetup');
+  const tabs = document.getElementById('aiTabs');
+  if (setup) setup.style.display = 'none';
+  if (tabs) tabs.style.display = 'block';
 }
 
-/* ── Restore key from session on load ── */
 window.addEventListener('DOMContentLoaded', () => {
-  const saved = sessionStorage.getItem('groq_key');
-  if (saved) {
-    GROQ_KEY = saved;
+  const savedKey = sessionStorage.getItem('groq_key');
+  if (savedKey) {
+    GROQ_KEY = savedKey;
     const setup = document.getElementById('keySetup');
     const tabs = document.getElementById('aiTabs');
     if (setup) setup.style.display = 'none';
@@ -279,221 +466,293 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* Allow Enter key on API key input */
-document.addEventListener('keydown', e => {
-  if (e.target.id === 'groqKeyInput' && e.key === 'Enter') activateGroq();
+document.addEventListener('keydown', event => {
+  if (event.target.id === 'groqKeyInput' && event.key === 'Enter') {
+    activateGroq();
+  }
 });
 
-/* ── Tab switching ── */
-function switchTab(id, btn) {
-  document.querySelectorAll('.ai-tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.ai-tab-btn').forEach(b => b.classList.remove('active'));
-  const panel = document.getElementById('tab-' + id);
+function switchTab(id, button) {
+  document.querySelectorAll('.ai-tab-panel').forEach(panel => panel.classList.remove('active'));
+  document.querySelectorAll('.ai-tab-btn').forEach(tabButton => tabButton.classList.remove('active'));
+
+  const panel = document.getElementById(`tab-${id}`);
   if (panel) panel.classList.add('active');
-  if (btn) btn.classList.add('active');
+  if (button) button.classList.add('active');
 }
 
-/* ══ TAB 1: LIVE CHAT ══ */
 const chatHistory = [{ role: 'system', content: SENTHIL_CONTEXT }];
 
 function scrollChat() {
-  const el = document.getElementById('chatMessages');
-  if (el) el.scrollTop = el.scrollHeight;
+  const container = document.getElementById('chatMessages');
+  if (container) {
+    container.scrollTop = container.scrollHeight;
+  }
 }
 
 function addChatMsg(role, text) {
-  const msgs = document.getElementById('chatMessages');
-  if (!msgs) return;
-  const div = document.createElement('div');
-  div.className = `ai-chat__message ai-chat__message--${role}`;
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = `ai-chat__message ai-chat__message--${role}`;
+
   const bubble = document.createElement('div');
   bubble.className = 'ai-chat__bubble';
   bubble.textContent = text;
-  div.appendChild(bubble);
-  msgs.appendChild(div);
+
+  wrapper.appendChild(bubble);
+  messages.appendChild(wrapper);
   scrollChat();
 }
 
 function showTyping() {
-  const msgs = document.getElementById('chatMessages');
-  if (!msgs) return;
-  const div = document.createElement('div');
-  div.id = 'typingDot'; div.className = 'ai-chat__message ai-chat__message--assistant';
-  div.innerHTML = '<div class="ai-chat__typing"><div class="ai-chat__typing-dot"></div><div class="ai-chat__typing-dot"></div><div class="ai-chat__typing-dot"></div></div>';
-  msgs.appendChild(div); scrollChat();
-}
-function removeTyping() { const t = document.getElementById('typingDot'); if (t) t.remove(); }
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
 
-function quickChat(btn) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ai-chat__message ai-chat__message--assistant';
+  wrapper.id = 'typingDot';
+  wrapper.innerHTML = '<div class="ai-chat__typing"><div class="ai-chat__typing-dot"></div><div class="ai-chat__typing-dot"></div><div class="ai-chat__typing-dot"></div></div>';
+  messages.appendChild(wrapper);
+  scrollChat();
+}
+
+function removeTyping() {
+  const element = document.getElementById('typingDot');
+  if (element) element.remove();
+}
+
+function quickChat(button) {
   const input = document.getElementById('chatInput');
   if (!input) return;
-  input.value = btn.textContent.trim();
+  input.value = button.textContent.trim();
   sendChat();
 }
 
 async function sendChat() {
   const input = document.getElementById('chatInput');
-  const sendBtn = document.getElementById('chatSend');
+  const sendButton = document.getElementById('chatSend');
   if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
+
+  const prompt = input.value.trim();
+  if (!prompt) return;
 
   input.value = '';
-  if (sendBtn) sendBtn.disabled = true;
-  addChatMsg('user', text);
-  chatHistory.push({ role: 'user', content: text });
+  if (sendButton) sendButton.disabled = true;
+  addChatMsg('user', prompt);
+  chatHistory.push({ role: 'user', content: prompt });
   showTyping();
 
   try {
-    const reply = await callGroq(chatHistory, 600);
+    const reply = await callGroq(chatHistory, 700);
     chatHistory.push({ role: 'assistant', content: reply });
     removeTyping();
     addChatMsg('assistant', reply);
-  } catch (err) {
+  } catch (error) {
     removeTyping();
-    const msg = err.message.includes('401') || err.message.includes('invalid')
-      ? 'Invalid API key — please refresh and re-enter your Groq key.'
-      : err.message.includes('429')
-      ? 'Rate limit — wait 10 seconds and try again.'
-      : 'Error: ' + err.message;
-    addChatMsg('assistant', msg);
+    const message = error.message.includes('401')
+      ? 'That Groq key did not authenticate. Please refresh and try again.'
+      : error.message.includes('429')
+      ? 'Rate limit reached. Please wait a few seconds and try again.'
+      : `Error: ${error.message}`;
+    addChatMsg('assistant', message);
   } finally {
-    if (sendBtn) sendBtn.disabled = false;
-    if (input) input.focus();
+    if (sendButton) sendButton.disabled = false;
+    input.focus();
   }
 }
 
-document.addEventListener('keydown', e => {
-  if (e.target.id === 'chatInput' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+document.addEventListener('keydown', event => {
+  if (event.target.id === 'chatInput' && event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendChat();
+  }
 });
 
-/* ══ TAB 2: PROJECT SCOPER ══ */
 async function runScoper() {
   const idea = document.getElementById('scoperIdea')?.value.trim();
   const stage = document.getElementById('scoperStage')?.value || 'idea';
   const team = document.getElementById('scoperTeam')?.value || 'solo';
   const challenge = document.getElementById('scoperChallenge')?.value.trim() || 'Not specified';
   const output = document.getElementById('scoperOutput');
-  const btn = document.getElementById('scoperBtn');
+  const button = document.getElementById('scoperBtn');
 
   if (!idea || idea.length < 20) {
-    const f = document.getElementById('scoperIdea');
-    if (f) { f.style.borderColor = '#f43f5e'; setTimeout(() => { f.style.borderColor = ''; }, 2000); }
+    const field = document.getElementById('scoperIdea');
+    if (field) {
+      field.style.borderColor = '#d24b38';
+      setTimeout(() => {
+        field.style.borderColor = '';
+      }, 2200);
+    }
     return;
   }
 
-  btn.disabled = true; btn.textContent = 'Scoping your idea…';
-  output.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em">ANALYSING YOUR STARTUP…</div>';
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Scoping your MVP...';
+  }
+  if (output) {
+    output.innerHTML = '<div class="ai-output"><div class="ai-output__section">Thinking</div><div class="ai-output__body">Analyzing the idea, constraints, and likely MVP path...</div></div>';
+  }
 
-  const prompt = `As Senthilkumar Sivaraman (AI Product Strategist, Co-Founder ZAS Digital), a founder just pitched you their idea in a discovery sprint. Give an honest, structured, actionable MVP scope plan.
+  const prompt = `As Senthilkumar Sivaraman, give an honest MVP scope plan for this startup idea.
 
-Startup idea: "${idea}"
-Stage: ${stage} | Team: ${team} | Key challenge: "${challenge}"
+Idea: ${idea}
+Stage: ${stage}
+Team size: ${team}
+Biggest challenge: ${challenge}
 
-Respond using EXACTLY these section headers (include the emoji):
+Respond using exactly these plain section headers:
+PROBLEM VALIDATION
+AI STACK RECOMMENDATION
+3-WEEK MVP PLAN
+TOP 3 RISKS
+MINIMUM VIABLE SCOPE
+MY HONEST TAKE
 
-🎯 PROBLEM VALIDATION
-Is this a real problem worth solving? Any red flags? Be honest.
-
-🤖 AI STACK RECOMMENDATION  
-RAG / Agents / Fine-tune / Simple API — what's right and why. Be specific.
-
-⏱️ 3-WEEK MVP PLAN
-Week 1: [what to build]
-Week 2: [what to build]
-Week 3: [what to validate]
-
-⚠️ TOP 3 RISKS
-1. [specific risk]
-2. [specific risk]
-3. [specific risk]
-
-🚀 MINIMUM VIABLE SCOPE
-What are the 3 things that MUST be in v1. What to cut.
-
-💬 MY HONEST TAKE
-1–2 sentences of direct founder-to-founder advice.`;
+Use concise bullets where helpful.`;
 
   try {
-    const reply = await callGroq([{ role: 'system', content: SENTHIL_CONTEXT }, { role: 'user', content: prompt }], 1000);
-    output.innerHTML = renderOutput(reply);
-  } catch (err) {
-    output.innerHTML = `<div style="padding:24px;color:#f87171;font-size:13px;font-family:var(--font-mono)">Error: ${escHtml(err.message)}</div>`;
+    const reply = await callGroq(
+      [
+        { role: 'system', content: SENTHIL_CONTEXT },
+        { role: 'user', content: prompt }
+      ],
+      1100
+    );
+    if (output) output.innerHTML = renderOutput(reply);
+  } catch (error) {
+    if (output) {
+      output.innerHTML = `<div class="ai-output"><div class="ai-output__section">Error</div><div class="ai-output__body">${escHtml(error.message)}</div></div>`;
+    }
   } finally {
-    btn.disabled = false; btn.textContent = 'Generate MVP Scope Plan →';
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Generate MVP Scope Plan';
+    }
   }
 }
 
-/* ══ TAB 3: JD MATCHER ══ */
 async function runJDMatch() {
   const jd = document.getElementById('jdInput')?.value.trim();
   const output = document.getElementById('jdOutput');
-  const btn = document.getElementById('jdBtn');
+  const button = document.getElementById('jdBtn');
 
   if (!jd || jd.length < 50) {
-    const f = document.getElementById('jdInput');
-    if (f) { f.style.borderColor = '#f43f5e'; setTimeout(() => { f.style.borderColor = ''; }, 2000); }
+    const field = document.getElementById('jdInput');
+    if (field) {
+      field.style.borderColor = '#d24b38';
+      setTimeout(() => {
+        field.style.borderColor = '';
+      }, 2200);
+    }
     return;
   }
 
-  btn.disabled = true; btn.textContent = 'Matching profile…';
-  output.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em">ANALYSING JOB REQUIREMENTS…</div>';
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Matching profile...';
+  }
+  if (output) {
+    output.innerHTML = '<div class="ai-output"><div class="ai-output__section">Thinking</div><div class="ai-output__body">Reviewing the role requirements against Senthil\'s background...</div></div>';
+  }
 
-  const prompt = `Analyse this job description against Senthilkumar Sivaraman's full profile. Be honest — don't oversell, don't undersell. Use his REAL experience: ZAS Digital, Eflex, EduHire, Enmovil, Mindtree/P&G, Maanavar.
+  const prompt = `Analyze this job description against Senthilkumar Sivaraman's actual background.
+Be honest but always constructive. Do not oversell, but do not state gaps as hard negatives either.
 
 JOB DESCRIPTION:
 ${jd}
 
-Respond using EXACTLY these section headers (include the emoji):
+Respond using exactly these plain section headers:
+FIT SCORE
+STRONG MATCHES
+WHERE I ADD MORE THAN ASKED
+HONEST GAPS
+RECOMMENDATION
 
-📊 FIT SCORE: [X/10]
-One sentence explaining the score honestly.
-
-✅ STRONG MATCHES
-Bullet points — specific skills/projects/metrics from Senthil's background that directly match what the JD requires.
-
-⚡ WHERE I ADD MORE THAN ASKED
-2–3 things Senthil brings that go beyond the JD requirements — extra value.
-
-⚠️ HONEST GAPS
-Any real gaps or things to address upfront. If none exist, say so clearly.
-
-💬 RECOMMENDATION
-Should they reach out? Direct honest answer. If yes or likely yes, end with: "Email me at senthil@zasdigital.in to discuss."`;
+Under FIT SCORE, use the format X/10.
+Under HONEST GAPS, frame any gaps diplomatically — acknowledge the area, then pivot to adjacent experience, transferable strength, or willingness and ability to grow quickly. Never state a gap as a flat negative without pairing it with a positive context. For example: instead of "I don't have X experience", say "While my direct X exposure is more limited, my work in [related area] gave me strong grounding in the underlying challenges — and I've consistently picked up new domain contexts quickly."
+If the JD mentions work location, travel, or relocation — note that Senthil is fully open to any country, any work mode (remote, hybrid, on-site), and international assignments with no restrictions.`;
 
   try {
-    const reply = await callGroq([{ role: 'system', content: SENTHIL_CONTEXT }, { role: 'user', content: prompt }], 900);
-    output.innerHTML = renderOutput(reply);
-  } catch (err) {
-    output.innerHTML = `<div style="padding:24px;color:#f87171;font-size:13px;font-family:var(--font-mono)">Error: ${escHtml(err.message)}</div>`;
+    const reply = await callGroq(
+      [
+        { role: 'system', content: SENTHIL_CONTEXT },
+        { role: 'user', content: prompt }
+      ],
+      1000
+    );
+    if (output) output.innerHTML = renderOutput(reply);
+  } catch (error) {
+    if (output) {
+      output.innerHTML = `<div class="ai-output"><div class="ai-output__section">Error</div><div class="ai-output__body">${escHtml(error.message)}</div></div>`;
+    }
   } finally {
-    btn.disabled = false; btn.textContent = 'Match Against My Profile →';
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Match Against My Profile';
+    }
   }
 }
 
-/* ── Render structured AI output ── */
 function renderOutput(text) {
+  const knownHeadings = new Set([
+    'PROBLEM VALIDATION',
+    'AI STACK RECOMMENDATION',
+    '3-WEEK MVP PLAN',
+    'TOP 3 RISKS',
+    'MINIMUM VIABLE SCOPE',
+    'MY HONEST TAKE',
+    'FIT SCORE',
+    'STRONG MATCHES',
+    'WHERE I ADD MORE THAN ASKED',
+    'HONEST GAPS',
+    'RECOMMENDATION'
+  ]);
+
   const lines = text.split('\n');
-  let html = '<div class="ai-output">';
+  let markup = '<div class="ai-output">';
+
   lines.forEach(line => {
-    const t = line.trim();
-    if (!t) { html += '<div class="ai-output__gap"></div>'; return; }
-    if (/^[🎯🤖⏱️⚠️🚀💬📊✅⚡]/.test(t)) {
-      html += `<div class="ai-output__section">${escHtml(t)}</div>`;
-    } else if (/^[-•]\s/.test(t)) {
-      html += `<div class="ai-output__bullet"><span class="ai-output__bullet-dot">→</span>${escHtml(t.slice(2))}</div>`;
-    } else if (/^\d+[.)]\s/.test(t)) {
-      html += `<div class="ai-output__bullet"><span class="ai-output__bullet-dot">→</span>${escHtml(t.replace(/^\d+[.)]\s/, ''))}</div>`;
-    } else if (/^Week \d/.test(t)) {
-      html += `<div class="ai-output__week">${escHtml(t)}</div>`;
-    } else {
-      html += `<div class="ai-output__body">${escHtml(t)}</div>`;
+    const trimmed = line.trim();
+    if (!trimmed) {
+      markup += '<div class="ai-output__gap"></div>';
+      return;
     }
+
+    const sanitized = trimmed.replace(/:$/, '');
+    if (knownHeadings.has(sanitized)) {
+      markup += `<div class="ai-output__section">${escHtml(sanitized)}</div>`;
+      return;
+    }
+
+    if (/^week\s+\d+/i.test(trimmed)) {
+      markup += `<div class="ai-output__week">${escHtml(trimmed)}</div>`;
+      return;
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      markup += `<div class="ai-output__bullet"><span class="ai-output__bullet-dot">+</span><span>${escHtml(trimmed.replace(/^[-*]\s+/, ''))}</span></div>`;
+      return;
+    }
+
+    if (/^\d+[.)]\s+/.test(trimmed)) {
+      markup += `<div class="ai-output__bullet"><span class="ai-output__bullet-dot">${escHtml(trimmed.match(/^\d+/)?.[0] || '')}</span><span>${escHtml(trimmed.replace(/^\d+[.)]\s+/, ''))}</span></div>`;
+      return;
+    }
+
+    markup += `<div class="ai-output__body">${escHtml(trimmed)}</div>`;
   });
-  html += '</div>';
-  return html;
+
+  markup += '</div>';
+  return markup;
 }
 
-function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function escHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
