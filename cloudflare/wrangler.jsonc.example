@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sk-groq-proxy",
+  "main": "cloudflare/groq-proxy.mjs",
+  "compatibility_date": "2026-06-16",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "ALLOWED_ORIGINS": "https://senthilsivaraman.com",
+    "GROQ_MODEL": "llama-3.3-70b-versatile",
+    "RATE_LIMIT_MAX_REQUESTS": "10",
+    "RATE_LIMIT_WINDOW_MS": "3600000"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RATE_LIMITER",
+        "class_name": "IpRateLimiter"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "IpRateLimiter"
+      ]
+    }
+  ]
+}

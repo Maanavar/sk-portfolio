@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sk-groq-proxy",
+  "main": "cloudflare/groq-proxy.mjs",
+  "compatibility_date": "2026-06-16",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "ALLOWED_ORIGINS": "https://senthilsivaraman.com",
+    "GROQ_MODEL": "llama-3.3-70b-versatile"
+  }
+}
